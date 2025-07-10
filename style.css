@@ -1,0 +1,173 @@
+body {
+  background: transparent;
+  color: #eaf6fb;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+#menu {
+  display: none; /* Hide menu by default */
+  width: 260px;
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  padding: 14px 14px 10px 14px;
+  z-index: 1000;
+  border: 2px solid #174a7c;
+  background: linear-gradient(135deg, #23272a 80%, #2e3238 100%);
+}
+
+#menu h2 {
+  margin: 0 0 12px 0;
+  font-size: 24px;
+  color: #2196f3;
+  letter-spacing: 2px;
+  text-align: left;
+  font-weight: 900;
+  text-shadow: 0 4px 18px #174a7c, 0 2px 8px #000, 0 1px 0 #23272a;
+  background: none;
+  border-radius: 0;
+  padding: 0 0 8px 8px;
+  box-shadow: none;
+  text-transform: uppercase;
+  border-bottom: 2px solid #1a2330;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+ul li {
+  background: #2e3238;
+  border-left: 4px solid #2196f3;
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  border-radius: 7px;
+  font-size: 15px;
+  color: #eaf6fb;
+  transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+ul li:hover:not(.section) {
+  background: #174a7c;
+  color: #fff;
+  border-left: 4px solid #7fd6ff;
+}
+
+ul li.section {
+  background: #174a7c;
+  color: #eaf6fb;
+  font-weight: bold;
+  cursor: default;
+  font-size: 13px;
+  margin-top: 10px;
+  margin-bottom: 6px;
+  padding: 7px 10px 5px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  border: none;
+  box-shadow: none;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Submenu styling */
+#menu ul.submenu li {
+  background: #232e3a;
+  border-left: 4px solid #2196f3;
+  color: #b8e0ff;
+  font-size: 15px;
+  margin-bottom: 8px;
+  transition: background 0.18s, color 0.18s;
+}
+
+#menu ul.submenu li:hover {
+  background: #174a7c;
+  color: #fff;
+  border-left: 4px solid #7fd6ff;
+}
+
+#menu ul.submenu li.back {
+  background: none;
+  color: #2196f3;
+  font-weight: bold;
+  cursor: pointer;
+  border-left: none;
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+
+#menu ul {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+#menu ul::-webkit-scrollbar {
+  width: 8px;
+}
+#menu ul::-webkit-scrollbar-thumb {
+  background: #174a7c;
+  border-radius: 4px;
+}
+#menu ul::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  border: 2px solid #1e90ff;
+  border-radius: 4px;
+  vertical-align: middle;
+  background: #232e3a;
+  position: relative;
+  box-sizing: border-box;
+}
+.checkbox.checked {
+  background: #1e90ff;
+}
+.checkbox.checked::after {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  border-radius: 2px;
+}
+
+ul li.selected, #menu ul.submenu li.selected {
+  background: #2196f3 !important;
+  color: #fff !important;
+  font-weight: bold;
+  border-left: 4px solid #7fd6ff !important;
+  box-shadow: 0 2px 8px rgba(30,144,255,0.15);
+  z-index: 2;
+}
+ul li.selected .checkbox, #menu ul.submenu li.selected .checkbox {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px #2196f3;
+}
+
+/* Ensure checkbox and text are always vertically aligned */
+ul li, #menu ul.submenu li {
+  display: flex;
+  align-items: center;
+}
