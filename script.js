@@ -140,6 +140,12 @@ function buildSubMenu(modName, options, keepSelectedIndex) {
             if (modName === 'Neons') {
                 window.lastNeonSelectedIndex = index + 1; // +1 for back button
                 selectedIndex = window.lastNeonSelectedIndex;
+            } else if (modName === 'Max Upgrade') {
+                // Don't update selection on toggle actions
+            } else if (modName === 'Headlights') {
+                // For headlights, keep track of selection for colors
+                window.lastHeadlightSelectedIndex = index + 1;
+                selectedIndex = window.lastHeadlightSelectedIndex;
             }
             updateSelection();
             fetch(`https://${GetParentResourceName()}/selectModOption`, {
