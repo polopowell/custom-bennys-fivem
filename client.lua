@@ -54,8 +54,7 @@ local wheelTypes = {
 
 -- Debug function to print in F8 console and chat
 local function debugPrint(message)
-    print("^3[BENNYS DEBUG] ^7" .. message)
-    TriggerEvent('chat:addMessage', { args = { '^3[BENNYS] ^7' .. message } })
+    -- No-op: debug output disabled
 end
 
 -- Helper function to refresh vehicle after mod application
@@ -74,49 +73,86 @@ RegisterCommand('bennys', function()
     local ped = PlayerPedId()
     local veh = GetVehiclePedIsIn(ped, false)
     if veh ~= 0 then
-        -- Always set mod kit at the very beginning to ensure we detect all mods
         SetVehicleModKit(veh, 0)
-        Citizen.Wait(10) -- Small wait to ensure mod kit is applied
-        
-        -- Extra debug: print vehicle entity and model
-        debugPrint("Opening Benny's for vehicle: " .. tostring(veh) .. ", model: " .. tostring(GetEntityModel(veh)))
+        Citizen.Wait(10)
         local mods = {}
 
-        -- First, add wheel types selection
-        table.insert(mods, "Wheel Types")
-
-        -- Add all available mods for this specific vehicle
-        for modType, modName in pairs(modNames) do
-            if modType == 48 then -- Livery (special case)
-                local liveryCount = GetVehicleLiveryCount(veh)
-                if liveryCount > 0 then
-                    table.insert(mods, modName)
-                end
-            elseif modType == 22 then -- Headlights/Xenons (special case)
-                table.insert(mods, modName) -- Always available
-            elseif modType == 23 then -- Wheels (special case)
-                -- We handle wheels via the Wheel Types entry
-                -- Don't add to menu directly
-            elseif GetNumVehicleMods(veh, modType) > 0 then
-                table.insert(mods, modName)
+        -- Livery (if available)
+        local liveryCount = GetVehicleLiveryCount(veh)
+        if liveryCount > 0 then
+            table.insert(mods, "Livery")
+        end
+        -- Exterior mods (only if available)
+        for _, modType in ipairs({0,1,2,3,4,5,6,7,8,9,10}) do
+            if GetNumVehicleMods(veh, modType) > 0 then
+                table.insert(mods, modNames[modType])
             end
         end
 
-        -- Add window tint options (always available)
-        table.insert(mods, "Window Tint")
-        -- Add Neons to the menu
+        -- Add Paint option
+        table.insert(mods, "Paint")
+
+        -- Headlights (always show if mod 22 exists, or if vehicle supports xenon)
+        if GetNumVehicleMods(veh, 22) > 0 or true then
+            table.insert(mods, "Headlights")
+        end
+        -- Neons (always available for menu)
         table.insert(mods, "Neons")
-        
+
+        -- Max Upgrade button (always available)
+        table.insert(mods, "Max Upgrade")
+        -- Performance mods (only if available)
+        for _, modType in ipairs({11,12,13,15,16,18}) do
+            if (modType == 18 and IsToggleModOn(veh, 18) ~= nil) or GetNumVehicleMods(veh, modType) > 0 then
+                table.insert(mods, modNames[modType])
+            end
+        end
+
+        -- Other/Interior mods (only if available)
+        for _, modType in ipairs({14,24,25,27,28,30,33,34,35,38}) do
+            if GetNumVehicleMods(veh, modType) > 0 then
+                table.insert(mods, modNames[modType])
+            end
+        end
+        -- Wheel Types (only if at least one type is available)
+        local hasWheelType = false
+        for typeId, _ in pairs(wheelTypes) do
+            SetVehicleWheelType(veh, typeId)
+            if GetNumVehicleMods(veh, 23) > 0 then
+                hasWheelType = true
+                break
+            end
+        end
+        if hasWheelType then
+            table.insert(mods, "Wheel Types")
+        end
+        -- Window Tint (only if available)
+        if GetNumVehicleWindowTints and type(GetNumVehicleWindowTints) == "function" then
+            if GetNumVehicleWindowTints(veh) and GetNumVehicleWindowTints(veh) > 0 then
+                table.insert(mods, "Window Tint")
+            end
+        else
+            table.insert(mods, "Window Tint") -- fallback: always show
+        end
+
+        -- Convert section objects to strings for NUI, mark as 'section' for UI
+        local modsForNUI = {}
+        for _, v in ipairs(mods) do
+            if type(v) == 'table' and v.section then
+                -- skip section headers
+            else
+                table.insert(modsForNUI, v)
+            end
+        end
+
         SendNUIMessage({
             type = "setMods",
-            mods = mods
+            mods = modsForNUI
         })
 
         SetNuiFocus(true, false)
         menuOpen = true
         mouseCursorEnabled = false
-        
-        debugPrint("Opened Benny's with " .. #mods .. " available mod types")
     else
         TriggerEvent('chat:addMessage', { args = { '^1You are not in a vehicle!' } })
     end
@@ -140,20 +176,21 @@ local function buildNeonsOptions(veh)
         end
     end
     table.insert(options, { name = "Enable All Neons", index = "enable_all", checked = allOn })
+    -- GTA V neon color order and names
     local neonColors = {
         { name = "White", rgb = "255,255,255" },
-        { name = "Red", rgb = "255,0,0" },
-        { name = "Blue", rgb = "0,0,255" },
-        { name = "Green", rgb = "0,255,0" },
+        { name = "Blue", rgb = "2,21,255" },
+        { name = "Electric Blue", rgb = "3,83,255" },
+        { name = "Mint Green", rgb = "0,255,140" },
+        { name = "Lime Green", rgb = "94,255,1" },
         { name = "Yellow", rgb = "255,255,0" },
-        { name = "Orange", rgb = "255,128,0" },
-        { name = "Purple", rgb = "128,0,255" },
-        { name = "Pink", rgb = "255,0,255" },
-        { name = "Mint", rgb = "50,255,155" },
-        { name = "Golden Shower", rgb = "204,204,0" },
-        { name = "Electric Blue", rgb = "0,150,255" },
-        { name = "Lime Green", rgb = "128,255,0" },
-        { name = "Hot Pink", rgb = "255,50,128" }
+        { name = "Golden Shower", rgb = "255,150,0" },
+        { name = "Orange", rgb = "255,62,0" },
+        { name = "Red", rgb = "255,1,1" },
+        { name = "Pony Pink", rgb = "255,50,100" },
+        { name = "Hot Pink", rgb = "255,5,190" },
+        { name = "Purple", rgb = "35,1,255" },
+        { name = "Blacklight", rgb = "15,3,255" }
     }
     for _, c in ipairs(neonColors) do
         table.insert(options, { name = "Set Color: " .. c.name, index = "color:" .. c.rgb })
@@ -172,57 +209,219 @@ RegisterNUICallback('getModOptions', function(data, cb)
     local options = {} -- Always reset options here!
     -- ...existing code...
     if veh ~= 0 then
-        -- Special case: Wheel Types menu
-        if mod == "Wheel Types" then
-            for typeId, typeName in pairs(wheelTypes) do
-                -- Only add wheel types that actually have wheels for this vehicle
-                SetVehicleWheelType(veh, typeId)
-                if GetNumVehicleMods(veh, 23) > 0 then
-                    table.insert(options, { name = typeName, index = typeId })
-                end
-            end
-            
-            -- Reset to Sport wheels after checking
-            SetVehicleWheelType(veh, 0)
-        -- Special case: Window Tint
-        elseif mod == "Window Tint" then
-            local tints = {
-                { name = "None", index = 0 },
-                { name = "Pure Black", index = 1 },
-                { name = "Darksmoke", index = 2 },
-                { name = "Lightsmoke", index = 3 },
-                { name = "Limo", index = 4 },
-                { name = "Green", index = 5 }
+        -- Paint submenu
+        if mod == "Paint" then
+            table.insert(options, { name = "Primary Color", index = "primary" })
+            table.insert(options, { name = "Secondary Color", index = "secondary" })
+            table.insert(options, { name = "Pearlescent", index = "pearlescent" })
+        elseif mod == "Primary Color" or mod == "Secondary Color" then
+            -- Full GTA V color palette (Metallic, Matte, Classic, Utility, Worn, Chrome, etc.)
+            local paintColors = {
+                { name = "Metallic Black", id = 0 },
+                { name = "Metallic Graphite Black", id = 1 },
+                { name = "Metallic Black Steel", id = 2 },
+                { name = "Metallic Dark Silver", id = 3 },
+                { name = "Metallic Silver", id = 4 },
+                { name = "Metallic Blue Silver", id = 5 },
+                { name = "Metallic Steel Gray", id = 6 },
+                { name = "Metallic Shadow Silver", id = 7 },
+                { name = "Metallic Stone Silver", id = 8 },
+                { name = "Metallic Midnight Silver", id = 9 },
+                { name = "Metallic Gun Metal", id = 10 },
+                { name = "Metallic Anthracite Grey", id = 11 },
+                { name = "Matte Black", id = 12 },
+                { name = "Matte Gray", id = 13 },
+                { name = "Matte Light Grey", id = 14 },
+                { name = "Util Black", id = 15 },
+                { name = "Util Black Poly", id = 16 },
+                { name = "Util Dark Silver", id = 17 },
+                { name = "Util Silver", id = 18 },
+                { name = "Util Gun Metal", id = 19 },
+                { name = "Util Shadow Silver", id = 20 },
+                { name = "Worn Black", id = 21 },
+                { name = "Worn Graphite", id = 22 },
+                { name = "Worn Silver Grey", id = 23 },
+                { name = "Worn Silver", id = 24 },
+                { name = "Worn Blue Silver", id = 25 },
+                { name = "Worn Shadow Silver", id = 26 },
+                { name = "Metallic Red", id = 27 },
+                { name = "Metallic Torino Red", id = 28 },
+                { name = "Metallic Formula Red", id = 29 },
+                { name = "Metallic Blaze Red", id = 30 },
+                { name = "Metallic Graceful Red", id = 31 },
+                { name = "Metallic Garnet Red", id = 32 },
+                { name = "Metallic Desert Red", id = 33 },
+                { name = "Metallic Cabernet Red", id = 34 },
+                { name = "Metallic Candy Red", id = 35 },
+                { name = "Metallic Sunrise Orange", id = 36 },
+                { name = "Metallic Classic Gold", id = 37 },
+                { name = "Metallic Orange", id = 38 },
+                { name = "Matte Red", id = 39 },
+                { name = "Matte Dark Red", id = 40 },
+                { name = "Matte Orange", id = 41 },
+                { name = "Matte Yellow", id = 42 },
+                { name = "Util Red", id = 43 },
+                { name = "Util Bright Red", id = 44 },
+                { name = "Util Garnet Red", id = 45 },
+                { name = "Worn Red", id = 46 },
+                { name = "Worn Golden Red", id = 47 },
+                { name = "Worn Dark Red", id = 48 },
+                { name = "Metallic Dark Green", id = 49 },
+                { name = "Metallic Racing Green", id = 50 },
+                { name = "Metallic Sea Green", id = 51 },
+                { name = "Metallic Olive Green", id = 52 },
+                { name = "Metallic Green", id = 53 },
+                { name = "Metallic Gasoline Blue Green", id = 54 },
+                { name = "Matte Lime Green", id = 55 },
+                { name = "Util Dark Green", id = 56 },
+                { name = "Util Green", id = 57 },
+                { name = "Worn Dark Green", id = 58 },
+                { name = "Worn Green", id = 59 },
+                { name = "Worn Sea Wash", id = 60 },
+                { name = "Metallic Midnight Blue", id = 61 },
+                { name = "Metallic Dark Blue", id = 62 },
+                { name = "Metallic Saxony Blue", id = 63 },
+                { name = "Metallic Blue", id = 64 },
+                { name = "Metallic Mariner Blue", id = 65 },
+                { name = "Metallic Harbor Blue", id = 66 },
+                { name = "Metallic Diamond Blue", id = 67 },
+                { name = "Metallic Surf Blue", id = 68 },
+                { name = "Metallic Nautical Blue", id = 69 },
+                { name = "Metallic Bright Blue", id = 70 },
+                { name = "Metallic Purple Blue", id = 71 },
+                { name = "Metallic Spinnaker Blue", id = 72 },
+                { name = "Metallic Ultra Blue", id = 73 },
+                { name = "Metallic Bright Blue 2", id = 74 },
+                { name = "Util Dark Blue", id = 75 },
+                { name = "Util Midnight Blue", id = 76 },
+                { name = "Util Blue", id = 77 },
+                { name = "Util Sea Foam Blue", id = 78 },
+                { name = "Util Lightning Blue", id = 79 },
+                { name = "Util Maui Blue Poly", id = 80 },
+                { name = "Util Bright Blue", id = 81 },
+                { name = "Matte Dark Blue", id = 82 },
+                { name = "Matte Blue", id = 83 },
+                { name = "Matte Midnight Blue", id = 84 },
+                { name = "Worn Dark Blue", id = 85 },
+                { name = "Worn Blue", id = 86 },
+                { name = "Worn Light Blue", id = 87 },
+                { name = "Metallic Taxi Yellow", id = 88 },
+                { name = "Metallic Race Yellow", id = 89 },
+                { name = "Metallic Bronze", id = 90 },
+                { name = "Metallic Yellow Bird", id = 91 },
+                { name = "Metallic Lime", id = 92 },
+                { name = "Metallic Champagne", id = 93 },
+                { name = "Metallic Pueblo Beige", id = 94 },
+                { name = "Metallic Dark Ivory", id = 95 },
+                { name = "Metallic Choco Brown", id = 96 },
+                { name = "Metallic Golden Brown", id = 97 },
+                { name = "Metallic Light Brown", id = 98 },
+                { name = "Metallic Straw Beige", id = 99 },
+                { name = "Metallic Moss Brown", id = 100 },
+                { name = "Metallic Biston Brown", id = 101 },
+                { name = "Metallic Beechwood", id = 102 },
+                { name = "Metallic Dark Beechwood", id = 103 },
+                { name = "Metallic Choco Orange", id = 104 },
+                { name = "Metallic Beach Sand", id = 105 },
+                { name = "Metallic Sun Bleeched Sand", id = 106 },
+                { name = "Metallic Cream", id = 107 },
+                { name = "Util Brown", id = 108 },
+                { name = "Util Medium Brown", id = 109 },
+                { name = "Util Light Brown", id = 110 },
+                { name = "Metallic White", id = 111 },
+                { name = "Metallic Frost White", id = 112 },
+                { name = "Worn Honey Beige", id = 113 },
+                { name = "Worn Brown", id = 114 },
+                { name = "Worn Dark Brown", id = 115 },
+                { name = "Worn Straw Beige", id = 116 },
+                { name = "Brushed Steel", id = 117 },
+                { name = "Brushed Black Steel", id = 118 },
+                { name = "Brushed Aluminum", id = 119 },
+                { name = "Chrome", id = 120 },
+                { name = "Worn Off White", id = 121 },
+                { name = "Util Off White", id = 122 },
+                { name = "Worn Orange", id = 123 },
+                { name = "Worn Light Orange", id = 124 },
+                { name = "Metallic Securicor Green", id = 125 },
+                { name = "Worn Taxi Yellow", id = 126 },
+                { name = "Police Car Blue", id = 127 },
+                { name = "Matte Green", id = 128 },
+                { name = "Matte Brown", id = 129 },
+                { name = "Worn Orange 2", id = 130 },
+                { name = "Matte White", id = 131 },
+                { name = "Worn White", id = 132 },
+                { name = "Worn Olive Army Green", id = 133 },
+                { name = "Pure White", id = 134 },
+                { name = "Hot Pink", id = 135 },
+                { name = "Salmon Pink", id = 136 },
+                { name = "Metallic Vermillion Pink", id = 137 },
+                { name = "Orange", id = 138 },
+                { name = "Green", id = 139 },
+                { name = "Blue", id = 140 },
+                { name = "Metallic Black Blue", id = 141 },
+                { name = "Metallic Black Purple", id = 142 },
+                { name = "Metallic Black Red", id = 143 },
+                { name = "Hunter Green", id = 144 },
+                { name = "Metallic Purple", id = 145 },
+                { name = "Metalic V Dark Blue", id = 146 },
+                { name = "Modshop Black1", id = 147 },
+                { name = "Matte Purple", id = 148 },
+                { name = "Matte Dark Purple", id = 149 },
+                { name = "Metallic Lava Red", id = 150 },
+                { name = "Matte Forest Green", id = 151 },
+                { name = "Matte Olive Drab", id = 152 },
+                { name = "Matte Desert Brown", id = 153 },
+                { name = "Matte Desert Tan", id = 154 },
+                { name = "Matte Foliage Green", id = 155 },
+                { name = "Default Alloy Color", id = 156 },
+                { name = "Epsilon Blue", id = 157 },
+                { name = "Pure Gold", id = 158 },
+                { name = "Brushed Gold", id = 159 }
             }
-            options = tints
-        -- Special case: Headlights
-        elseif mod == "Headlights" then
-            table.insert(options, { name = "Stock Lights", index = -1 })
-            table.insert(options, { name = "Xenon Lights", index = 1 })
-            
-            -- Add headlight colors if xenon is enabled
-            local colors = {
-                { name = "White", index = 0 },
-                { name = "Blue", index = 1 },
-                { name = "Electric Blue", index = 2 },
-                { name = "Mint Green", index = 3 },
-                { name = "Lime Green", index = 4 },
-                { name = "Yellow", index = 5 },
-                { name = "Golden Shower", index = 6 },
-                { name = "Orange", index = 7 },
-                { name = "Red", index = 8 },
-                { name = "Pony Pink", index = 9 },
-                { name = "Hot Pink", index = 10 },
-                { name = "Purple", index = 11 },
-                { name = "Blacklight", index = 12 }
-            }
-            
-            for _, color in ipairs(colors) do
-                table.insert(options, { name = color.name .. " Xenon", index = "color:" .. color.index })
+            for _, c in ipairs(paintColors) do
+                table.insert(options, { name = c.name, index = c.id })
             end
-        -- Special case: Neons
-        elseif mod == "Neons" then
-            options = buildNeonsOptions(veh)
+        elseif mod == "Pearlescent" then
+            -- Pearlescent overlay options (using GTA V color IDs)
+            local pearls = {
+                { name = "White", id = 111 },
+                { name = "Black", id = 0 },
+                { name = "Silver", id = 4 },
+                { name = "Blue Silver", id = 5 },
+                { name = "Red", id = 27 },
+                { name = "Torino Red", id = 28 },
+                { name = "Formula Red", id = 29 },
+                { name = "Blaze Red", id = 30 },
+                { name = "Orange", id = 38 },
+                { name = "Sunrise Orange", id = 36 },
+                { name = "Yellow", id = 42 },
+                { name = "Race Yellow", id = 89 },
+                { name = "Lime Green", id = 92 },
+                { name = "Green", id = 53 },
+                { name = "Dark Green", id = 49 },
+                { name = "Sea Green", id = 51 },
+                { name = "Blue", id = 64 },
+                { name = "Mariner Blue", id = 65 },
+                { name = "Harbor Blue", id = 66 },
+                { name = "Diamond Blue", id = 67 },
+                { name = "Surf Blue", id = 68 },
+                { name = "Ultra Blue", id = 73 },
+                { name = "Bright Blue", id = 70 },
+                { name = "Purple Blue", id = 71 },
+                { name = "Spinnaker Blue", id = 72 },
+                { name = "Purple", id = 145 },
+                { name = "Dark Purple", id = 149 },
+                { name = "Pony Pink", id = 137 },
+                { name = "Hot Pink", id = 135 },
+                { name = "Brown", id = 98 },
+                { name = "Golden Brown", id = 97 },
+                { name = "Dark Ivory", id = 95 },
+                { name = "Straw Beige", id = 99 },
+                { name = "Cream", id = 107 }
+            }
+            for _, c in ipairs(pearls) do
+                table.insert(options, { name = c.name, index = c.id })
+            end
         -- Regular case: Standard vehicle mods
         else
             local modType = nil
@@ -292,9 +491,80 @@ RegisterNUICallback('selectModOption', function(data, cb)
     end
     -- ...existing code...
     if veh ~= 0 then
+        -- Paint submenu navigation (send options directly)
+        if mod == "Paint" and (optionIndex == "primary" or optionIndex == "secondary" or optionIndex == "pearlescent") then
+            local submenu = (optionIndex == "primary" and "Primary Color") or (optionIndex == "secondary" and "Secondary Color") or "Pearlescent"
+            local options = {}
+            if submenu == "Primary Color" or submenu == "Secondary Color" then
+                local paintColors = {
+                    { name = "Metallic Black", id = 0 }, { name = "Metallic Graphite Black", id = 1 }, { name = "Metallic Black Steel", id = 2 }, { name = "Metallic Dark Silver", id = 3 }, { name = "Metallic Silver", id = 4 }, { name = "Metallic Blue Silver", id = 5 }, { name = "Metallic Steel Gray", id = 6 }, { name = "Metallic Shadow Silver", id = 7 }, { name = "Metallic Stone Silver", id = 8 }, { name = "Metallic Midnight Silver", id = 9 }, { name = "Metallic Gun Metal", id = 10 }, { name = "Metallic Anthracite Grey", id = 11 }, { name = "Matte Black", id = 12 }, { name = "Matte Gray", id = 13 }, { name = "Matte Light Grey", id = 14 }, { name = "Util Black", id = 15 }, { name = "Util Black Poly", id = 16 }, { name = "Util Dark Silver", id = 17 }, { name = "Util Silver", id = 18 }, { name = "Util Gun Metal", id = 19 }, { name = "Util Shadow Silver", id = 20 }, { name = "Worn Black", id = 21 }, { name = "Worn Graphite", id = 22 }, { name = "Worn Silver Grey", id = 23 }, { name = "Worn Silver", id = 24 }, { name = "Worn Blue Silver", id = 25 }, { name = "Worn Shadow Silver", id = 26 }, { name = "Metallic Red", id = 27 }, { name = "Metallic Torino Red", id = 28 }, { name = "Metallic Formula Red", id = 29 }, { name = "Metallic Blaze Red", id = 30 }, { name = "Metallic Graceful Red", id = 31 }, { name = "Metallic Garnet Red", id = 32 }, { name = "Metallic Desert Red", id = 33 }, { name = "Metallic Cabernet Red", id = 34 }, { name = "Metallic Candy Red", id = 35 }, { name = "Metallic Sunrise Orange", id = 36 }, { name = "Metallic Classic Gold", id = 37 }, { name = "Metallic Orange", id = 38 }, { name = "Matte Red", id = 39 }, { name = "Matte Dark Red", id = 40 }, { name = "Matte Orange", id = 41 }, { name = "Matte Yellow", id = 42 }, { name = "Util Red", id = 43 }, { name = "Util Bright Red", id = 44 }, { name = "Util Garnet Red", id = 45 }, { name = "Worn Red", id = 46 }, { name = "Worn Golden Red", id = 47 }, { name = "Worn Dark Red", id = 48 }, { name = "Metallic Dark Green", id = 49 }, { name = "Metallic Racing Green", id = 50 }, { name = "Metallic Sea Green", id = 51 }, { name = "Metallic Olive Green", id = 52 }, { name = "Metallic Green", id = 53 }, { name = "Metallic Gasoline Blue Green", id = 54 }, { name = "Matte Lime Green", id = 55 }, { name = "Util Dark Green", id = 56 }, { name = "Util Green", id = 57 }, { name = "Worn Dark Green", id = 58 }, { name = "Worn Green", id = 59 }, { name = "Worn Sea Wash", id = 60 }, { name = "Metallic Midnight Blue", id = 61 }, { name = "Metallic Dark Blue", id = 62 },
+                { name = "Metallic Saxony Blue", id = 63 }, { name = "Metallic Blue", id = 64 }, { name = "Metallic Mariner Blue", id = 65 }, { name = "Metallic Harbor Blue", id = 66 }, { name = "Metallic Diamond Blue", id = 67 }, { name = "Metallic Surf Blue", id = 68 }, { name = "Metallic Nautical Blue", id = 69 }, { name = "Metallic Bright Blue", id = 70 }, { name = "Metallic Purple Blue", id = 71 }, { name = "Metallic Spinnaker Blue", id = 72 }, { name = "Metallic Ultra Blue", id = 73 }, { name = "Metallic Bright Blue 2", id = 74 }, { name = "Util Dark Blue", id = 75 }, { name = "Util Midnight Blue", id = 76 }, { name = "Util Blue", id = 77 }, { name = "Util Sea Foam Blue", id = 78 }, { name = "Util Lightning Blue", id = 79 }, { name = "Util Maui Blue Poly", id = 80 }, { name = "Util Bright Blue", id = 81 }, { name = "Matte Dark Blue", id = 82 }, { name = "Matte Blue", id = 83 }, { name = "Matte Midnight Blue", id = 84 }, { name = "Worn Dark Blue", id = 85 }, { name = "Worn Blue", id = 86 }, { name = "Worn Light Blue", id = 87 }, { name = "Metallic Taxi Yellow", id = 88 }, { name = "Metallic Race Yellow", id = 89 }, { name = "Metallic Bronze", id = 90 }, { name = "Metallic Yellow Bird", id = 91 }, { name = "Metallic Lime", id = 92 }, { name = "Metallic Champagne", id = 93 }, { name = "Metallic Pueblo Beige", id = 94 }, { name = "Metallic Dark Ivory", id = 95 }, { name = "Metallic Choco Brown", id = 96 }, { name = "Metallic Golden Brown", id = 97 }, { name = "Metallic Light Brown", id = 98 }, { name = "Metallic Straw Beige", id = 99 }, { name = "Metallic Moss Brown", id = 100 }, { name = "Metallic Biston Brown", id = 101 }, { name = "Metallic Beechwood", id = 102 }, { name = "Metallic Dark Beechwood", id = 103 }, { name = "Metallic Choco Orange", id = 104 }, { name = "Metallic Beach Sand", id = 105 }, { name = "Metallic Sun Bleeched Sand", id = 106 }, { name = "Metallic Cream", id = 107 }, { name = "Util Brown", id = 108 }, { name = "Util Medium Brown", id = 109 }, { name = "Util Light Brown", id = 110 }, { name = "Metallic White", id = 111 }, { name = "Metallic Frost White", id = 112 }, { name = "Worn Honey Beige", id = 113 }, { name = "Worn Brown", id = 114 }, { name = "Worn Dark Brown", id = 115 }, { name = "Worn Straw Beige", id = 116 }, { name = "Brushed Steel", id = 117 }, { name = "Brushed Black Steel", id = 118 }, { name = "Brushed Aluminum", id = 119 }, { name = "Chrome", id = 120 }, { name = "Worn Off White", id = 121 }, { name = "Util Off White", id = 122 }, { name = "Worn Orange", id = 123 }, { name = "Worn Light Orange", id = 124 }, { name = "Metallic Securicor Green", id = 125 }, { name = "Worn Taxi Yellow", id = 126 }, { name = "Police Car Blue", id = 127 }, { name = "Matte Green", id = 128 }, { name = "Matte Brown", id = 129 }, { name = "Worn Orange 2", id = 130 }, { name = "Matte White", id = 131 }, { name = "Worn White", id = 132 }, { name = "Worn Olive Army Green", id = 133 }, { name = "Pure White", id = 134 }, { name = "Hot Pink", id = 135 }, { name = "Salmon Pink", id = 136 }, { name = "Metallic Vermillion Pink", id = 137 }, { name = "Orange", id = 138 }, { name = "Green", id = 139 }, { name = "Blue", id = 140 }, { name = "Metallic Black Blue", id = 141 }, { name = "Metallic Black Purple", id = 142 }, { name = "Metallic Black Red", id = 143 }, { name = "Hunter Green", id = 144 }, { name = "Metallic Purple", id = 145 }, { name = "Metalic V Dark Blue", id = 146 }, { name = "Modshop Black1", id = 147 }, { name = "Matte Purple", id = 148 }, { name = "Matte Dark Purple", id = 149 }, { name = "Metallic Lava Red", id = 150 }, { name = "Matte Forest Green", id = 151 }, { name = "Matte Olive Drab", id = 152 }, { name = "Matte Desert Brown", id = 153 }, { name = "Matte Desert Tan", id = 154 }, { name = "Matte Foliage Green", id = 155 }, { name = "Default Alloy Color", id = 156 }, { name = "Epsilon Blue", id = 157 }, { name = "Pure Gold", id = 158 }, { name = "Brushed Gold", id = 159 }
+                }
+                for _, c in ipairs(paintColors) do
+                    table.insert(options, { name = c.name, index = c.id })
+                end
+            elseif submenu == "Pearlescent" then
+                local pearls = {
+                    { name = "White", id = 111 }, { name = "Black", id = 0 }, { name = "Silver", id = 4 }, { name = "Blue Silver", id = 5 }, { name = "Red", id = 27 }, { name = "Torino Red", id = 28 }, { name = "Formula Red", id = 29 }, { name = "Blaze Red", id = 30 }, { name = "Orange", id = 38 }, { name = "Sunrise Orange", id = 36 }, { name = "Yellow", id = 42 }, { name = "Race Yellow", id = 89 }, { name = "Lime Green", id = 92 }, { name = "Green", id = 53 }, { name = "Dark Green", id = 49 }, { name = "Sea Green", id = 51 }, { name = "Blue", id = 64 }, { name = "Mariner Blue", id = 65 }, { name = "Harbor Blue", id = 66 }, { name = "Diamond Blue", id = 67 }, { name = "Surf Blue", id = 68 }, { name = "Ultra Blue", id = 73 }, { name = "Bright Blue", id = 70 }, { name = "Purple Blue", id = 71 }, { name = "Spinnaker Blue", id = 72 }, { name = "Purple", id = 145 }, { name = "Dark Purple", id = 149 }, { name = "Pony Pink", id = 137 }, { name = "Hot Pink", id = 135 }, { name = "Brown", id = 98 }, { name = "Golden Brown", id = 97 }, { name = "Dark Ivory", id = 95 }, { name = "Straw Beige", id = 99 }, { name = "Cream", id = 107 }
+                }
+                for _, c in ipairs(pearls) do
+                    table.insert(options, { name = c.name, index = c.id })
+                end
+            end
+            SendNUIMessage({
+                type = "setModOptions",
+                modName = submenu,
+                options = options
+            })
+            return cb('ok')
+        end
+        -- Paint color application
+        if mod == "Primary Color" then
+            local _, sec, pearl = GetVehicleColours(veh)
+            SetVehicleColours(veh, tonumber(optionIndex), sec)
+            refreshVehicle(veh)
+            return cb('ok')
+        end
+        if mod == "Secondary Color" then
+            local pri, _, pearl = GetVehicleColours(veh)
+            SetVehicleColours(veh, pri, tonumber(optionIndex))
+            refreshVehicle(veh)
+            return cb('ok')
+        end
+        if mod == "Pearlescent" then
+            local pri, sec, _ = GetVehicleColours(veh)
+            SetVehicleExtraColours(veh, tonumber(optionIndex), GetVehicleExtraColours(veh))
+            refreshVehicle(veh)
+            return cb('ok')
+        end
+        -- Max Upgrade Button logic
+        if mod == "Max Upgrade" and optionIndex == "max_upgrade" then
+            -- Apply all max upgrades
+            for _, modType in ipairs({11,12,13,15,16,18}) do
+                local numMods = GetNumVehicleMods(veh, modType)
+                if modType == 18 then
+                    ToggleVehicleMod(veh, 18, true) -- Turbo
+                elseif numMods > 0 then
+                    SetVehicleMod(veh, modType, numMods - 1, false)
+                end
+            end
+            -- Also max armor if available
+            if GetNumVehicleMods(veh, 16) > 0 then
+                SetVehicleMod(veh, 16, GetNumVehicleMods(veh, 16) - 1, false)
+            end
+            -- Max engine upgrades
+            if GetNumVehicleMods(veh, 11) > 0 then
+                SetVehicleMod(veh, 11, GetNumVehicleMods(veh, 11) - 1, false)
+            end
+            refreshVehicle(veh)
+            debugPrint("Applied max upgrades to vehicle!")
+            return cb('ok')
+        end
         -- Special case 1: Wheel Types (first level selection)
         if mod == "Wheel Types" then
+            SetVehicleModKit(veh, 0)
             SetVehicleWheelType(veh, tonumber(optionIndex))
+            Citizen.Wait(50)
             local wheelOptions = {}
             local wheelCount = GetNumVehicleMods(veh, 23)
             table.insert(wheelOptions, { name = "Stock", index = -1 })
@@ -326,24 +596,22 @@ RegisterNUICallback('selectModOption', function(data, cb)
             end
             debugPrint("Trying to apply wheel: wheelTypeName="..tostring(wheelTypeName)..", wheelTypeId="..tostring(wheelTypeId)..", optionIndex="..tostring(optionIndex))
             if wheelTypeId then
+                SetVehicleModKit(veh, 0)
                 SetVehicleWheelType(veh, wheelTypeId)
-                Citizen.Wait(50) -- Ensure wheel type is set before applying mod
+                Citizen.Wait(50)
                 -- Only apply if the label is valid
                 local label = GetModTextLabel(veh, 23, tonumber(optionIndex))
                 local display = label and GetLabelText(label)
                 if tonumber(optionIndex) == -1 or (display and display ~= "NULL") then
-                    -- Try with custom wheels first (true)
                     SetVehicleMod(veh, 23, tonumber(optionIndex), true)
-                    -- Also try with non-custom wheels (false) as fallback
                     Citizen.Wait(10)
                     SetVehicleMod(veh, 23, tonumber(optionIndex), false)
-                    
                     -- Force a more thorough refresh
                     refreshVehicle(veh)
-                    -- Force refresh wheels specifically
+                    -- Force wheel type and mod to reapply after refresh
+                    SetVehicleModKit(veh, 0)
                     SetVehicleWheelType(veh, wheelTypeId)
                     SetVehicleMod(veh, 23, tonumber(optionIndex), true)
-                    
                     debugPrint("Applied wheel type " .. tostring(wheelTypeName) .. " (" .. tostring(wheelTypeId) .. ") and wheel mod: " .. tostring(optionIndex))
                 else
                     debugPrint("Attempted to apply invalid wheel index: " .. tostring(optionIndex) .. ", label: " .. tostring(label) .. ", display: " .. tostring(display))
@@ -353,7 +621,6 @@ RegisterNUICallback('selectModOption', function(data, cb)
             end
             return cb('ok')
         end
-        
         -- Special case 3: Window Tint
         if mod == "Window Tint" then
             SetVehicleWindowTint(veh, tonumber(optionIndex))
@@ -367,7 +634,6 @@ RegisterNUICallback('selectModOption', function(data, cb)
             debugPrint("Applied window tint: " .. optionIndex)
             return cb('ok')
         end
-        
         -- Special case 4: Headlights
         if mod == "Headlights" then
             if type(optionIndex) == "string" and optionIndex:sub(1, 6) == "color:" then
@@ -384,7 +650,6 @@ RegisterNUICallback('selectModOption', function(data, cb)
             end
             return cb('ok')
         end
-        
         -- Special case: Neons
         if mod == "Neons" then
             if optionIndex == "enable_all" then
@@ -415,7 +680,6 @@ RegisterNUICallback('selectModOption', function(data, cb)
             debugPrint("Refreshed Neons submenu with " .. #options .. " options")
             return cb('ok')
         end
-        
         -- Regular mods (all other cases)
         local modType = nil
         for k, v in pairs(modNames) do
@@ -424,7 +688,6 @@ RegisterNUICallback('selectModOption', function(data, cb)
                 break
             end
         end
-        
         if modType then
             -- Special case: Livery
             if modType == 48 then
@@ -441,7 +704,6 @@ RegisterNUICallback('selectModOption', function(data, cb)
             end
         end
     end
-    
     cb('ok')
 end)
 

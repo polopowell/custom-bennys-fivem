@@ -128,7 +128,7 @@ function buildSubMenu(modName, options, keepSelectedIndex) {
     // Always build submenu from latest options (no caching)
     options.forEach((opt, index) => {
         const li = document.createElement('li');
-        if (modName === 'Neons' && opt.index === 'enable_all') {
+        if ((modName === 'Neons' && opt.index === 'enable_all') || (modName === 'Max Upgrade' && opt.index === 'max_upgrade')) {
             li.innerHTML = `<span class="checkbox${opt.checked ? ' checked' : ''}"></span> <span>${opt.name}</span>`;
         } else {
             li.textContent = opt.name;
@@ -137,8 +137,10 @@ function buildSubMenu(modName, options, keepSelectedIndex) {
         li.dataset.optionIndex = opt.index;
         li.addEventListener('click', function(e) {
             // Save the intended selection index for after refresh
-            window.lastNeonSelectedIndex = index + 1; // +1 for back button
-            selectedIndex = window.lastNeonSelectedIndex;
+            if (modName === 'Neons') {
+                window.lastNeonSelectedIndex = index + 1; // +1 for back button
+                selectedIndex = window.lastNeonSelectedIndex;
+            }
             updateSelection();
             fetch(`https://${GetParentResourceName()}/selectModOption`, {
                 method: 'POST',
